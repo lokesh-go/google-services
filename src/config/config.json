@@ -1,0 +1,11 @@
+{
+    "gdrive": {
+        "credential": {
+            "clientSecret": "/Users/lokeshchandra/Desktop/google/credentials.json",
+            "token": "/Users/lokeshchandra/Desktop/google/token.json"
+        },
+        "list": {
+            "pageSize": 100
+        }
+    }
+}
