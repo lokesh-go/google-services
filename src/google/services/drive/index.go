@@ -2,10 +2,10 @@ package drive
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 
 	configModule "github.com/lokesh-go/google-services/src/config"
@@ -32,32 +32,76 @@ func NewService(client *http.Client, config *configModule.Config) (*Serivce, err
 	}, nil
 }
 
-func (s *Serivce) List() (driveDetails []DriveList, err error) {
-	// Gets drive list
-	driveList, err := s.drive.Drives.List().PageSize(s.config.GDrive.List.PageSize).Do()
+// FileSearch ...
+func (s *Serivce) FileSearch(searchKey string) (fileDetails []FileList, err error) {
+	// Forms file search query
+	searchQuery := s.formFileSearchQuery(searchKey)
+
+	// Gets file list
+	files, err := s.getFileList(searchQuery)
 	if err != nil {
 		return nil, err
 	}
 
-	// Checks
-	if len(driveList.Drives) == 0 {
-		return nil, errors.New("drive list found empty")
-	}
-
 	// Range
-	driveDetails = []DriveList{}
-	for _, d := range driveList.Drives {
-		
-		// Prepare list
-		list := DriveList{
-			Id:   d.Id,
-			Name: d.Name,
+	fileDetails = []FileList{}
+	for _, f := range files {
+		list := FileList{
+			Id:            f.Id,
+			DriveId:       f.DriveId,
+			Name:          f.Name,
+			Size:          f.Size,
+			FileExtension: f.FileExtension,
+			MimeType:      f.MimeType,
+			Md5Checksum:   f.Md5Checksum,
 		}
 
 		// Appends
-		driveDetails = append(driveDetails, list)
+		fileDetails = append(fileDetails, list)
 	}
 
 	// Returns
-	return driveDetails, nil
+	return fileDetails, nil
+}
+
+func (s *Serivce) formFileSearchQuery(searchKey string) (query string) {
+	// Gets file search config
+	fileConfig := s.config.GDrive.FileSearch
+
+	// Forms search query
+	query = fileConfig.Query.NotContainsFolder + " and " + fileConfig.Query.FileContains + searchKey + "' and " + fileConfig.Query.NotContainsTrash
+
+	// Returns
+	return query
+}
+
+func (s *Serivce) getFileList(searchQuery string) (files []*drive.File, err error) {
+	var pageToken string
+	files = []*drive.File{}
+	fileConfig := s.config.GDrive.FileSearch
+
+	for {
+		// Gets file lists
+		fileList, err := s.drive.Files.List().SupportsAllDrives(fileConfig.SupportsAllDrives).IncludeItemsFromAllDrives(fileConfig.IncludeItemsFromAllDrives).Corpora(fileConfig.Corpora).Spaces(fileConfig.Spaces).Fields(googleapi.Field(fileConfig.Fields)).Q(searchQuery).PageSize(fileConfig.PageSize).PageToken(pageToken).Do()
+		if err != nil {
+			return nil, err
+		}
+
+		// Appends
+		files = append(files, fileList.Files...)
+
+		// Searches not extends
+		if !fileConfig.Extend {
+			break
+		}
+
+		// Checks
+		pageToken = fileList.NextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+
+	// Returns
+	return files, nil
 }

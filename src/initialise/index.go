@@ -31,12 +31,15 @@ func Init() (err error) {
 	}
 
 	// Gets list
-	list, err := driveService.List()
+	list, err := driveService.FileSearch("endgame imax 7.1")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(list)
+	// Ranging list
+	for k, v := range list {
+		fmt.Println(k+1, " --- ", v.Name, " --- ", v.MimeType)
+	}
 
 	// Returns
 	return nil

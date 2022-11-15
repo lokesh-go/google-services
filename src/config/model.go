@@ -7,8 +7,19 @@ type Config struct {
 			ClientSecret string
 			Token        string
 		}
-		List struct {
-			PageSize int64
+		FileSearch struct {
+			PageSize                  int64
+			Extend                    bool
+			SupportsAllDrives         bool
+			IncludeItemsFromAllDrives bool
+			Corpora                   string
+			Spaces                    string
+			Fields                    string
+			Query                     struct {
+				FileContains      string
+				NotContainsFolder string
+				NotContainsTrash  string
+			}
 		}
 	}
 }

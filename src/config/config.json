@@ -4,8 +4,19 @@
             "clientSecret": "/Users/lokeshchandra/Desktop/google/credentials.json",
             "token": "/Users/lokeshchandra/Desktop/google/token.json"
         },
-        "list": {
-            "pageSize": 100
+        "fileSearch": {
+            "pageSize": 100,
+            "extend": false,
+            "supportsAllDrives": true,
+            "includeItemsFromAllDrives": true,
+            "corpora": "allDrives",
+            "spaces": "drive",
+            "fields": "nextPageToken, files(id, driveId, name, mimeType, size, fileExtension, md5Checksum)",
+            "query": {
+                "fileContains": "name contains '",
+                "notContainsFolder": "mimeType != 'application/vnd.google-apps.folder'",
+                "notContainsTrash": "trashed=false"
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -75,6 +76,21 @@ func (m *Module) getClient(oauthConfig *oauth2.Config) (client *http.Client, err
 	if err != nil {
 		// Request a token from the web, then returns the retrieved token.
 		oauthToken, err = getTokenFromWeb(oauthConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		// Saves token
+		err = m.saveToken(oauthToken)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Refresh token if token has expired
+	if oauthToken.Expiry.Before(time.Now()) {
+		// Gets new token
+		oauthToken, err = oauthConfig.TokenSource(context.Background(), oauthToken).Token()
 		if err != nil {
 			return nil, err
 		}
