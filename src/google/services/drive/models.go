@@ -1,9 +1,10 @@
 package drive
 
-// FileList ...
-type FileList struct {
+// File ...
+type File struct {
 	Id            string `json:"id"`
 	DriveId       string `json:"driveId"`
+	DownloadLink  string `json:"downloadLink"`
 	Name          string `json:"name"`
 	Size          int64  `json:"size"`
 	FileExtension string `json:"fileExtension"`

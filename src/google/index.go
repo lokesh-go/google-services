@@ -12,34 +12,37 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	configModule "github.com/lokesh-go/google-services/src/config"
 	gdriveScopes "github.com/lokesh-go/google-services/src/google/services/drive/scopes"
 	utils "github.com/lokesh-go/google-services/src/utils"
 )
 
-// Module ...
-type Module struct {
-	Config *configModule.Config
+// Config ...
+type Config struct {
+	ClientSecretFilePath string
+	TokenPath            string
+	Scopes               Scopes
+}
+
+type Scopes struct {
+	DriveScope bool
 }
 
 // New ...
-func New(config *configModule.Config) *Module {
+func New(config *Config) *Config {
 	// Returns
-	return &Module{
-		Config: config,
-	}
+	return config
 }
 
 // GetClient ...
-func (m *Module) GetClient() (client *http.Client, err error) {
+func (c *Config) GetClient() (client *http.Client, err error) {
 	// Gets oauth config
-	oauthConfig, err := m.getOAuthConfig()
+	oauthConfig, err := c.getOAuthConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	// Gets client
-	client, err = m.getClient(oauthConfig)
+	client, err = c.getClient(oauthConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -48,15 +51,15 @@ func (m *Module) GetClient() (client *http.Client, err error) {
 	return client, nil
 }
 
-func (m *Module) getOAuthConfig() (oauthConfig *oauth2.Config, err error) {
+func (c *Config) getOAuthConfig() (oauthConfig *oauth2.Config, err error) {
 	// Reads credential file
-	bytes, err := ioutil.ReadFile(m.Config.GDrive.Credential.ClientSecret)
+	bytes, err := ioutil.ReadFile(c.ClientSecretFilePath)
 	if err != nil {
 		return nil, err
 	}
 
 	// Gets scops
-	scopes := getScopes()
+	scopes := c.getScopes()
 
 	// Gets google oauth config
 	oauthConfig, err = google.ConfigFromJSON(bytes, scopes)
@@ -68,11 +71,11 @@ func (m *Module) getOAuthConfig() (oauthConfig *oauth2.Config, err error) {
 	return oauthConfig, nil
 }
 
-func (m *Module) getClient(oauthConfig *oauth2.Config) (client *http.Client, err error) {
+func (c *Config) getClient(oauthConfig *oauth2.Config) (client *http.Client, err error) {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	oauthToken, err := m.tokenFromFile()
+	oauthToken, err := c.tokenFromFile()
 	if err != nil {
 		// Request a token from the web, then returns the retrieved token.
 		oauthToken, err = getTokenFromWeb(oauthConfig)
@@ -81,7 +84,7 @@ func (m *Module) getClient(oauthConfig *oauth2.Config) (client *http.Client, err
 		}
 
 		// Saves token
-		err = m.saveToken(oauthToken)
+		err = c.saveToken(oauthToken)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +99,7 @@ func (m *Module) getClient(oauthConfig *oauth2.Config) (client *http.Client, err
 		}
 
 		// Saves token
-		err = m.saveToken(oauthToken)
+		err = c.saveToken(oauthToken)
 		if err != nil {
 			return nil, err
 		}
@@ -106,9 +109,9 @@ func (m *Module) getClient(oauthConfig *oauth2.Config) (client *http.Client, err
 	return oauthConfig.Client(context.Background(), oauthToken), nil
 }
 
-func (m *Module) tokenFromFile() (oauthToken *oauth2.Token, err error) {
+func (c *Config) tokenFromFile() (oauthToken *oauth2.Token, err error) {
 	// Reads token file
-	err = utils.ReadJSONFile(m.Config.GDrive.Credential.Token, &oauthToken)
+	err = utils.ReadJSONFile(c.TokenPath, &oauthToken)
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +140,9 @@ func getTokenFromWeb(oauthConfig *oauth2.Config) (oauthToken *oauth2.Token, err 
 	return oauthToken, nil
 }
 
-func (m *Module) saveToken(oauthToken *oauth2.Token) (err error) {
+func (c *Config) saveToken(oauthToken *oauth2.Token) (err error) {
 	// Saves token to the path
-	file, err := os.OpenFile(m.Config.GDrive.Credential.Token, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(c.TokenPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -150,10 +153,12 @@ func (m *Module) saveToken(oauthToken *oauth2.Token) (err error) {
 	return nil
 }
 
-func getScopes() (scope string) {
+func (c *Config) getScopes() (scope string) {
 	// Gets drive scopes
-	gdriveScope := gdriveScopes.Get()
+	if c.Scopes.DriveScope {
+		scope = gdriveScopes.Get()
+	}
 
 	// Returns
-	return gdriveScope
+	return scope
 }

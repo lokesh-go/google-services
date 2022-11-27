@@ -3,22 +3,23 @@ package drive
 import (
 	"context"
 	"net/http"
+	"strings"
+	"sync"
 
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 
-	configModule "github.com/lokesh-go/google-services/src/config"
+	config "github.com/lokesh-go/google-services/src/config"
 )
 
 // Service ...
-type Serivce struct {
-	drive  *drive.Service
-	config *configModule.Config
+type Service struct {
+	drive *drive.Service
 }
 
 // NewService ...
-func NewService(client *http.Client, config *configModule.Config) (*Serivce, error) {
+func NewService(client *http.Client) (*Service, error) {
 	// Gets new drive service
 	service, err := drive.NewService(context.Background(), option.WithHTTPClient(client))
 	if err != nil {
@@ -26,63 +27,55 @@ func NewService(client *http.Client, config *configModule.Config) (*Serivce, err
 	}
 
 	// Returns
-	return &Serivce{
-		drive:  service,
-		config: config,
+	return &Service{
+		drive: service,
 	}, nil
 }
 
 // FileSearch ...
-func (s *Serivce) FileSearch(searchKey string) (fileDetails []FileList, err error) {
+func (s *Service) FileSearch(searchKey string, searchExtend bool, removeDownloadQuotaLimitFile bool) (filesData []File, err error) {
 	// Forms file search query
 	searchQuery := s.formFileSearchQuery(searchKey)
 
 	// Gets file list
-	files, err := s.getFileList(searchQuery)
+	files, err := s.getFileList(searchQuery, searchExtend)
 	if err != nil {
 		return nil, err
 	}
 
-	// Range
-	fileDetails = []FileList{}
-	for _, f := range files {
-		list := FileList{
-			Id:            f.Id,
-			DriveId:       f.DriveId,
-			Name:          f.Name,
-			Size:          f.Size,
-			FileExtension: f.FileExtension,
-			MimeType:      f.MimeType,
-			Md5Checksum:   f.Md5Checksum,
-		}
+	// Forms file response data
+	filesData = s.formFilesData(files, removeDownloadQuotaLimitFile)
 
-		// Appends
-		fileDetails = append(fileDetails, list)
+	// Returns
+	return filesData, nil
+}
+
+func (s *Service) FileDownload(fileId string) (res *http.Response, err error) {
+	// Downloads
+	res, err = s.drive.Files.Get(fileId).Download()
+	if err != nil {
+		return nil, err
 	}
 
 	// Returns
-	return fileDetails, nil
+	return res, nil
 }
 
-func (s *Serivce) formFileSearchQuery(searchKey string) (query string) {
-	// Gets file search config
-	fileConfig := s.config.GDrive.FileSearch
-
+func (s *Service) formFileSearchQuery(searchKey string) (query string) {
 	// Forms search query
-	query = fileConfig.Query.NotContainsFolder + " and " + fileConfig.Query.FileContains + searchKey + "' and " + fileConfig.Query.NotContainsTrash
+	query = config.FileSearchQueryNotContainsFolder + " and " + config.FileSearchQueryNameContains + searchKey + "' and " + config.FileSearchQueryNotContainsTrash
 
 	// Returns
 	return query
 }
 
-func (s *Serivce) getFileList(searchQuery string) (files []*drive.File, err error) {
+func (s *Service) getFileList(searchQuery string, searchExtend bool) (files []*drive.File, err error) {
 	var pageToken string
 	files = []*drive.File{}
-	fileConfig := s.config.GDrive.FileSearch
 
 	for {
 		// Gets file lists
-		fileList, err := s.drive.Files.List().SupportsAllDrives(fileConfig.SupportsAllDrives).IncludeItemsFromAllDrives(fileConfig.IncludeItemsFromAllDrives).Corpora(fileConfig.Corpora).Spaces(fileConfig.Spaces).Fields(googleapi.Field(fileConfig.Fields)).Q(searchQuery).PageSize(fileConfig.PageSize).PageToken(pageToken).Do()
+		fileList, err := s.drive.Files.List().SupportsAllDrives(config.SupportsAllDrives).IncludeItemsFromAllDrives(config.IncludeItemsFromAllDrives).Corpora(config.Corpora).Spaces(config.Spaces).Fields(googleapi.Field(config.FileSearchFieldsIncluded)).Q(searchQuery).PageSize(config.FileSearchPageSize).PageToken(pageToken).Do()
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +84,7 @@ func (s *Serivce) getFileList(searchQuery string) (files []*drive.File, err erro
 		files = append(files, fileList.Files...)
 
 		// Searches not extends
-		if !fileConfig.Extend {
+		if !searchExtend {
 			break
 		}
 
@@ -104,4 +97,75 @@ func (s *Serivce) getFileList(searchQuery string) (files []*drive.File, err erro
 
 	// Returns
 	return files, nil
+}
+
+func (s *Service) formFilesData(files []*drive.File, removeDownloadQuotaLimitFile bool) (filesData []File) {
+	// Removes download quota limit file
+	if removeDownloadQuotaLimitFile {
+		filesData = s.removeDownloadQuotaLimit(files)
+		return filesData
+	}
+
+	// Ranges
+	filesData = []File{}
+	for _, file := range files {
+		// Forms file response
+		list := formFileResponse(file)
+
+		// Appends
+		filesData = append(filesData, list)
+	}
+
+	// Returns
+	return filesData
+}
+
+func (s *Service) removeDownloadQuotaLimit(files []*drive.File) (fileList []File) {
+	// Defines waitgroup
+	var wg sync.WaitGroup
+
+	// Ranges
+	fileList = []File{}
+	for k, file := range files {
+		// Adds
+		wg.Add(1)
+
+		// Go routine
+		go func(file *drive.File, index int) {
+			// Done
+			defer wg.Done()
+
+			// Checks
+			_, err := s.FileDownload(file.Id)
+			if err == nil {
+				fileData := formFileResponse(file)
+				fileList = append(fileList, fileData)
+			}
+		}(file, k)
+	}
+	// Wait
+	wg.Wait()
+
+	// Returns
+	return fileList
+}
+
+func formFileResponse(file *drive.File) (fileData File) {
+	// Forms download link
+	fileDownloadLink := strings.ReplaceAll(config.FileDownloadLink, config.FileDownloadLinkPlaceholder, file.Id)
+
+	// Forms file response
+	fileData = File{
+		Id:            file.Id,
+		DriveId:       file.DriveId,
+		DownloadLink:  fileDownloadLink,
+		Name:          file.Name,
+		Size:          file.Size,
+		FileExtension: file.FileExtension,
+		MimeType:      file.MimeType,
+		Md5Checksum:   file.Md5Checksum,
+	}
+
+	// Returns
+	return fileData
 }
