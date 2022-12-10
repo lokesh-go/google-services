@@ -2,11 +2,11 @@
 
 # Google Service Wrapper
 
-Google service wrapper helps to understand about the how can you will authorise google service and get the google client to perform the any google service operations like gdrive, sheets etc.
+Google service wrapper helps to understand about how you can authorise google service and get the google client to perform any google service operations like gdrive, sheets etc.
 
-I had implemented the drive service wrapper with some examples like you can search all files from your all drives (included teamdrives).
+I have implemented the drive service wrapper with some examples like you can search all files from your all drives (included teamdrives).
 
-I had created example directory so you can see the implementation of this wrapper.
+I have also created an example directory where you can see the sample implementation of this wrapper.
 
 
 ## How to get this wrapper
