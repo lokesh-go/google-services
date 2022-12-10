@@ -31,7 +31,6 @@ func OpenFile(path string) (file *os.File, err error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
 	// Return
 	return file, nil
