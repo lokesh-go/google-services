@@ -29,13 +29,18 @@ func Init() (err error) {
 		return err
 	}
 
-	// upload file
-	id, err := driveService.FileCreate("testing.html", "text/html", "xyzabc", "example/a.html")
+	details, err := driveService.DriveDetails()
 	if err != nil {
 		log.Fatal("Error: ", err.Error())
 	}
+	fmt.Println(len(details.ShareDriveNames))
+	// upload file
+	// id, err := driveService.FileCreate("testing.html", "text/html", "xyzabc", "example/a.html")
+	// if err != nil {
+	// 	log.Fatal("Error: ", err.Error())
+	// }
 
-	fmt.Println("Uploaded File Id: ", id)
+	// fmt.Println("Uploaded File Id: ", id)
 
 	// Gets list
 	// list, err := driveService.FileSearch("avengers", false, true)
